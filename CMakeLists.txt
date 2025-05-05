@@ -23,6 +23,11 @@ file(GLOB_RECURSE CC_CORE_SOURCES CONFIGURE_DEPENDS
 
 list(REMOVE_ITEM CC_CORE_SOURCES ${PROJECT_SOURCE_DIR}/src/main.cpp)
 
+# --- enable GNU extensions on Cygwin so stdio declares fileno/fdopen ---
+if (CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
+  set(CMAKE_CXX_EXTENSIONS ON)
+endif()
+
 add_library(cc_core STATIC ${CC_CORE_SOURCES})
 
 target_include_directories(cc_core PUBLIC
