@@ -81,14 +81,17 @@ void Club::HandleArrived(const IncomingEvent& ev, std::vector<OutgoingEvent>& lo
 
 void Club::SeatClient(std::size_t table_idx, const std::string& name,
                       const Time time, const EventId outgoing_id,
-                      std::vector<OutgoingEvent>& log) {
+                      std::vector<OutgoingEvent>& log,
+                      bool emit_log) {
   Table& table = tables_[table_idx];
   table.occupant = name;
   table.occupied_since = time;
   clients_[name].table_id = table_idx;
-  std::ostringstream oss;
-  oss << name << ' ' << table.id;
-  log.push_back({time, outgoing_id, oss.str()});
+  if (emit_log) {                                   // ← новое условие
+    std::ostringstream oss;
+    oss << name << ' ' << table.id;
+    log.push_back({time, outgoing_id, oss.str()});
+  }
 }
 
 void Club::HandleSeated(const IncomingEvent& ev, std::vector<OutgoingEvent>& log) {
@@ -126,7 +129,7 @@ void Club::HandleSeated(const IncomingEvent& ev, std::vector<OutgoingEvent>& log
     old_table.occupant.reset();
   }
 
-  SeatClient(table_no - 1, name, ev.time, EventId::kClientSeated, log);
+  SeatClient(table_no - 1, name, ev.time, EventId::kClientSeated, log, false);
 }
 
 void Club::HandleWaiting(const IncomingEvent& ev, std::vector<OutgoingEvent>& log) {

@@ -29,7 +29,8 @@ namespace cc {
 
         void SeatClient(std::size_t table_idx, const std::string& name,
                         Time time, EventId outgoing_id,
-                        std::vector<OutgoingEvent>& log);
+                        std::vector<OutgoingEvent>& log,
+                        bool emit_log = true);
 
         void DropClient(const std::string& name, Time time,
                         std::vector<OutgoingEvent>& log,
