@@ -8,13 +8,13 @@
 
 namespace {
 
-/// ---------- helpers --------------------------------------------------------
 [[noreturn]] void Fail(std::size_t line, const std::string& msg) {
     std::ostringstream oss;
     oss << "Line " << line << ": " << msg;
     throw cc::ValidationError(oss.str());
 }
 
+// ---------- helpers for numeric conversion ---------------------------------
 template <typename UInt>
 UInt ToUInt(std::string_view token, const char* what, std::size_t line) {
     UInt v{};
@@ -30,8 +30,17 @@ bool NameOk(std::string_view s) {
     return std::regex_match(s.begin(), s.end(), kRe);
 }
 
-bool LooksLikeTableId(const std::string& tok) {
-    return !tok.empty() && std::all_of(tok.begin(), tok.end(), ::isdigit);
+bool IsDigits(std::string_view s) {
+    return !s.empty() && std::all_of(s.begin(), s.end(), ::isdigit);
+}
+
+/// Read next non‑empty line, preserving original numbering.
+std::string ReadNonEmpty(std::ifstream& in, std::string& buf, std::size_t& line) {
+    while (std::getline(in, buf)) {
+        ++line;
+        if (!buf.empty()) return buf;
+    }
+    Fail(line + 1, "unexpected EOF");   // never returns
 }
 
 }  // namespace
@@ -46,77 +55,89 @@ ParsedInput ParseFile(const std::filesystem::path& path) {
     std::string line;
     std::size_t line_no = 0;
 
-    auto getline_checked = [&]() -> std::string {
-        if (!std::getline(in, line)) Fail(line_no + 1, "unexpected EOF");
-        ++line_no;
-        return line;
-    };
-
-    // ----------- 1. table count --------------------------------------------
+    // ---------- 1. table count -------------------------------------------------
     {
-        std::string s = getline_checked();
-        out.cfg.table_count =
-            ToUInt<std::size_t>(std::string_view{s}, "table count", line_no);
+        std::string s = ReadNonEmpty(in, line, line_no);
+        std::istringstream ss(s);
+        std::string tok, extra;
+        if (!(ss >> tok) || ss >> extra)
+            Fail(line_no, "expected single integer table count");
+        out.cfg.table_count = ToUInt<std::size_t>(tok, "table count", line_no);
     }
 
-    // ----------- 2. open / close times -------------------------------------
+    // ---------- 2. open / close times -----------------------------------------
     {
-        std::istringstream ss(getline_checked());
-        std::string open_s, close_s;
-        if (!(ss >> open_s >> close_s))
-            Fail(line_no, "expected two times separated by space");
+        std::istringstream ss(ReadNonEmpty(in, line, line_no));
+        std::string open_s, close_s, extra;
+        if (!(ss >> open_s >> close_s) || (ss >> extra))
+            Fail(line_no, "expected two times: <open> <close>");
+
         out.cfg.open_time  = Time::Parse(open_s);
         out.cfg.close_time = Time::Parse(close_s);
         if (!(out.cfg.open_time < out.cfg.close_time))
             Fail(line_no, "open time must be earlier than close time");
     }
 
-    // ----------- 3. hourly price -------------------------------------------
+    // ---------- 3. hourly price -----------------------------------------------
     {
-        std::string s = getline_checked();
+        std::string s = ReadNonEmpty(in, line, line_no);
+        std::istringstream ss(s);
+        std::string price_s, extra;
+        if (!(ss >> price_s) || (ss >> extra))
+            Fail(line_no, "expected single integer hourly price");
         out.cfg.hourly_price =
-            ToUInt<std::uint32_t>(std::string_view{s}, "hourly price", line_no);
+            ToUInt<std::uint32_t>(price_s, "hourly price", line_no);
     }
 
     // ----------- 4. events --------------------------------------------------
     Time last_time{0};
+
     while (std::getline(in, line)) {
         ++line_no;
         if (line.empty()) continue;
 
         std::istringstream ss(line);
-        std::string time_s;
-        int id_int;
-        std::string name;
 
-        if (!(ss >> time_s >> id_int >> name))
-            Fail(line_no, "bad event header");
+        std::string time_tok;
+        std::string id_tok;
+        std::string first_payload;
 
-        if (!NameOk(name))
-            Fail(line_no, "invalid client name: " + name);
+        //  Обязательный минимум: три токена
+        if (!(ss >> time_tok >> id_tok >> first_payload))
+            Fail(line_no, "event must be: <time> <id> <payload>");
+
+        if (!IsDigits(id_tok))
+            Fail(line_no, "event id must be positive integer");
+        int id_int = ToUInt<int>(id_tok, "event id", line_no);
+
+        if (!NameOk(first_payload))
+            Fail(line_no, "invalid client name: " + first_payload);
 
         IncomingEvent ev;
-        ev.time = Time::Parse(time_s);
+        ev.time = Time::Parse(time_tok);
         ev.id   = static_cast<EventId>(id_int);
-        ev.payload.push_back(std::move(name));
+        ev.payload.push_back(std::move(first_payload));
 
+        /*  Остальные токены → payload          */
         std::string tok;
         while (ss >> tok) ev.payload.push_back(tok);
 
-        // chronological order
         if (ev.time < last_time)
             Fail(line_no, "events out of chronological order");
         last_time = ev.time;
 
-        // if first extra token is pure digits, treat as table number
-        if (ev.payload.size() >= 2 && LooksLikeTableId(ev.payload[1])) {
-            std::size_t table = ToUInt<std::size_t>(ev.payload[1], "table id", line_no);
+        /*  Если второй payload – цифры, считаем это номером стола  */
+        if (ev.payload.size() >= 2 && IsDigits(ev.payload[1])) {
+            auto table =
+                ToUInt<std::size_t>(ev.payload[1], "table id", line_no);
             if (table == 0 || table > out.cfg.table_count)
-                Fail(line_no, "table id out of range");
+                Fail(line_no, "table id out of range (1.." +
+                               std::to_string(out.cfg.table_count) + ')');
         }
 
         out.events.push_back(std::move(ev));
     }
+
 
     return out;
 }
