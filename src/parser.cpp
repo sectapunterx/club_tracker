@@ -108,7 +108,11 @@ ParsedInput ParseFile(const std::filesystem::path& path) {
 
         if (!IsDigits(id_tok))
             Fail(line_no, "event id must be positive integer");
+
         int id_int = ToUInt<int>(id_tok, "event id", line_no);
+
+        if (id_int < 1 || id_int > 4)
+            Fail(line_no, "event id must be 1, 2, 3 or 4 (incoming events only)");
 
         if (!NameOk(first_payload))
             Fail(line_no, "invalid client name: " + first_payload);
