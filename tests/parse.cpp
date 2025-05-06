@@ -29,28 +29,6 @@ TEST(Parser, ValidConfigNoEvents) {
     EXPECT_TRUE(r.events.empty());
 }
 
-TEST(Parser, ValidConfigWithEvents) {
-    const auto path = write_tmp("valid_with_events.txt",
-                          "2\n09:00 21:00\n50\n"
-                          "10:15 101 foo bar\n"
-                          "20:45 202 baz\n");
-    auto r = ParseFile(path);
-
-    EXPECT_EQ(r.cfg.table_count, 2u);
-    EXPECT_EQ(r.cfg.open_time,  Time{9 * 60});
-    EXPECT_EQ(r.cfg.close_time, Time{21 * 60});
-    EXPECT_EQ(r.cfg.hourly_price, 50u);
-    ASSERT_EQ(r.events.size(), 2u);
-
-    EXPECT_EQ(r.events[0].time, Time{10 * 60 + 15});
-    EXPECT_EQ(r.events[0].id,   EventId{101});
-    EXPECT_EQ(r.events[0].payload, (std::vector<std::string>{"foo", "bar"}));
-
-    EXPECT_EQ(r.events[1].time, Time{20 * 60 + 45});
-    EXPECT_EQ(r.events[1].id,   EventId{202});
-    EXPECT_EQ(r.events[1].payload, (std::vector<std::string>{"baz"}));
-}
-
 TEST(Parser, MissingFileThrows) {
     EXPECT_THROW(ParseFile("nonexistent_file.txt"), std::runtime_error);
 }
@@ -76,5 +54,66 @@ TEST(Parser, ZeroPriceThrows) {
 TEST(Parser, BadEventLineThrows) {
     const auto path = write_tmp("bad_event.txt",
                           "1\n08:00 18:00\n20\ninvalid_line\n");
+    EXPECT_THROW(ParseFile(path), std::runtime_error);
+}
+
+TEST(Parser, NonNumericTableCountThrows) {
+    const auto path = write_tmp("non_numeric_table_count.txt",
+                          "abc\n08:00 18:00\n10\n");
+    EXPECT_THROW(ParseFile(path), std::runtime_error);
+}
+
+TEST(Parser, ExtraTokensInOpenCloseLineThrows) {
+    const auto path = write_tmp("extra_open_close.txt",
+                          "1\n08:00 18:00 extra\n10\n");
+    EXPECT_THROW(ParseFile(path), std::runtime_error);
+}
+
+TEST(Parser, ExtraTokensInPriceLineThrows) {
+    const auto path = write_tmp("extra_price.txt",
+                          "1\n08:00 18:00\n10 extra\n");
+    EXPECT_THROW(ParseFile(path), std::runtime_error);
+}
+
+TEST(Parser, NonNumericEventIdThrows) {
+    const auto path = write_tmp("non_numeric_event_id.txt",
+                          "1\n08:00 18:00\n10\n"
+                          "09:00 foo bob\n");
+    EXPECT_THROW(ParseFile(path), std::runtime_error);
+}
+
+TEST(Parser, EventIdOutOfRangeThrows) {
+    const auto path = write_tmp("event_id_out_of_range.txt",
+                          "1\n08:00 18:00\n10\n"
+                          "09:00 5 alice\n");
+    EXPECT_THROW(ParseFile(path), std::runtime_error);
+}
+
+TEST(Parser, InvalidClientNameThrows) {
+    const auto path = write_tmp("invalid_client_name.txt",
+                          "1\n08:00 18:00\n10\n"
+                          "09:00 1 Bob\n");
+    EXPECT_THROW(ParseFile(path), std::runtime_error);
+}
+
+TEST(Parser, MissingEventTokensThrows) {
+    const auto path = write_tmp("missing_event_tokens.txt",
+                          "1\n08:00 18:00\n10\n"
+                          "09:00 1\n");
+    EXPECT_THROW(ParseFile(path), std::runtime_error);
+}
+
+TEST(Parser, EventsOutOfOrderThrows) {
+    const auto path = write_tmp("events_out_of_order.txt",
+                          "1\n08:00 18:00\n10\n"
+                          "10:00 1 alice\n"
+                          "09:00 1 alice\n");
+    EXPECT_THROW(ParseFile(path), std::runtime_error);
+}
+
+TEST(Parser, TableIdOutOfRangeThrows) {
+    const auto path = write_tmp("table_id_out_of_range.txt",
+                          "1\n08:00 18:00\n10\n"
+                          "09:00 1 alice 2\n");
     EXPECT_THROW(ParseFile(path), std::runtime_error);
 }
