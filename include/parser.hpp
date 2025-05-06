@@ -9,6 +9,11 @@
 
 namespace cc {
 
+    struct ValidationError : std::runtime_error {
+        explicit ValidationError(const std::string& what)
+            : std::runtime_error(what) {}
+    };
+
     struct Config {
         std::size_t table_count = 0;
         Time open_time;
