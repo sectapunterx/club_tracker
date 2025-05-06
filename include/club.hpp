@@ -32,7 +32,8 @@ namespace cc {
                         std::vector<OutgoingEvent>& log);
 
         void DropClient(const std::string& name, Time time,
-                        std::vector<OutgoingEvent>& log);
+                        std::vector<OutgoingEvent>& log,
+                        bool emit_left_event = true);
 
         Config cfg_;
         std::vector<Table> tables_;

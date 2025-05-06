@@ -155,7 +155,8 @@ void Club::HandleWaiting(const IncomingEvent& ev, std::vector<OutgoingEvent>& lo
 }
 
 void Club::DropClient(const std::string& name, Time time,
-                      std::vector<OutgoingEvent>& log) {
+                      std::vector<OutgoingEvent>& log,
+                      bool emit_left_event) {
   const auto it = clients_.find(name);
   if (it == clients_.end() || !it->second.in_club) return;
 
@@ -174,13 +175,14 @@ void Club::DropClient(const std::string& name, Time time,
     }
   }
 
-  log.push_back({time, EventId::kOutgoingLeft, name});
+  if (emit_left_event)
+    log.push_back({time, EventId::kOutgoingLeft, name});
   it->second.in_club = false;
 }
 
 void Club::HandleLeft(const IncomingEvent& ev, std::vector<OutgoingEvent>& log) {
   log.push_back({ev.time, ev.id, ev.payload[0]});
-  DropClient(ev.payload[0], ev.time, log);
+  DropClient(ev.payload[0], ev.time, log, false);
 }
 
 }  // namespace cc

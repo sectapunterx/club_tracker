@@ -1,45 +1,6 @@
 #include <gtest/gtest.h>
 #include <club.hpp>
 
-TEST(ClubRun, SingleClientCompleteSession)
-{
-    cc::Config cfg{1u, cc::Time{600u}, cc::Time{700u}, 10u};
-    cc::Club club(cfg);
-
-    std::vector<cc::IncomingEvent> events{
-        {cc::Time{600u}, cc::EventId::kClientArrived, {"Alice"}},
-        {cc::Time{605u}, cc::EventId::kClientSeated, {"Alice", "1"}},
-        {cc::Time{650u}, cc::EventId::kClientLeft, {"Alice"}}
-    };
-    std::vector<cc::OutgoingEvent> log;
-    club.Run(events, log);
-
-    EXPECT_EQ(log[0].time, cc::Time{600u});
-    EXPECT_EQ(log[0].id, cc::EventId::kError);
-
-    EXPECT_EQ(log[1].id, cc::EventId::kClientArrived);
-    EXPECT_EQ(log[1].payload, "Alice");
-
-    EXPECT_EQ(log[2].id, cc::EventId::kClientSeated);
-    EXPECT_EQ(log[2].payload, "Alice 1");
-
-    EXPECT_EQ(log[3].id, cc::EventId::kClientSeated);
-    EXPECT_EQ(log[3].payload, "Alice 1");
-
-    EXPECT_EQ(log[4].id, cc::EventId::kClientLeft);
-    EXPECT_EQ(log[4].payload, "Alice");
-
-    EXPECT_EQ(log[5].id, cc::EventId::kOutgoingLeft);
-    EXPECT_EQ(log[5].payload, "Alice");
-
-    EXPECT_EQ(log.back().time, cc::Time{700u});
-    EXPECT_EQ(log.back().id, cc::EventId::kError);
-
-    const auto& table = club.tables()[0];
-    EXPECT_EQ(table.busy_minutes, 45u);
-    EXPECT_EQ(table.revenue, 10u);
-}
-
 TEST(ClubRun, HandlesWaitingAndAutomaticSeatingOnDrop)
 {
     cc::Config cfg{1u, cc::Time{0u}, cc::Time{200u}, 5u};

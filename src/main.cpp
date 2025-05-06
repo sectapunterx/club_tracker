@@ -32,9 +32,10 @@ int main(int argc, char** argv) {
         PrintLog(log);
 
         for (const auto& t : club.tables()) {
-            const std::uint16_t h = t.busy_minutes / 60;
-            const std::uint16_t m = t.busy_minutes % 60;
-            std::cout << t.id << ' ' << t.revenue << ' ' << cc::Time(h * 60 + m).ToString()
+            const std::uint32_t h = t.busy_minutes / 60u;
+            const std::uint32_t m = t.busy_minutes % 60u;
+            const auto total = static_cast<std::uint16_t>(h * 60u + m);
+            std::cout << t.id << ' ' << t.revenue << ' ' << cc::Time(total).ToString()
                       << '\n';
         }
     } catch (const std::exception& ex) {
